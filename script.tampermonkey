@@ -1,0 +1,277 @@
+// ==UserScript==
+// @name         KameSame – JapanDict
+// @namespace    https://www.kamesame.com/
+// @version      2026-09-14
+// @description  Fügt auf KameSame JapanDict als ersten Eintrag bei "Open in:" hinzu
+// @match        https://www.kamesame.com/*
+// @icon         https://www.google.com/s2/favicons?sz=64&domain=kamesame.com
+// @grant        none
+// ==/UserScript==
+
+(function () {
+    'use strict';
+
+    const JAPANDICT_BASE = 'https://www.japandict.com/';
+
+    // JapanDict-Icon
+
+    function createJapanDictIcon() {
+
+        const svg = `
+            <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="128"
+                height="128"
+                viewBox="0 0 128 128"
+            >
+
+                <!-- weißer Hintergrund wie bei den KameSame-Icons -->
+                <rect
+                    x="0"
+                    y="0"
+                    width="128"
+                    height="128"
+                    rx="12"
+                    fill="#ffffff"
+                />
+
+                <!-- JapanDict-Logo -->
+                <rect
+                    x="24"
+                    y="24"
+                    width="80"
+                    height="80"
+                    rx="14"
+                    fill="#5b3a91"
+                />
+
+                <!-- japanisches Zeichen -->
+                <text
+                    x="64"
+                    y="82"
+                    text-anchor="middle"
+                    font-family="Arial, 'Noto Sans JP', sans-serif"
+                    font-size="55"
+                    font-weight="700"
+                    fill="#ffffff"
+                >日</text>
+
+            </svg>
+        `;
+
+        return 'data:image/svg+xml;charset=UTF-8,' +
+            encodeURIComponent(svg);
+    }
+
+
+    // JapanDict hinzufügen
+
+    function addJapanDict() {
+
+        const references =
+            document.querySelector('.references');
+
+        if (!references) {
+            return;
+        }
+
+        const apps =
+            references.querySelector('.apps');
+
+        if (!apps) {
+            return;
+        }
+
+
+
+        // die Vokabel über den bereits vorhandenen Jisho-Link ermitteln
+
+
+        const jishoLink =
+            apps.querySelector(
+                'a[href^="https://jisho.org/search/"]'
+            );
+
+        if (!jishoLink) {
+            return;
+        }
+
+
+        const jishoURL =
+            new URL(jishoLink.href);
+
+        let word =
+            jishoURL.pathname.replace(
+                /^\/search\//,
+                ''
+            );
+
+
+        try {
+
+            word =
+                decodeURIComponent(word);
+
+        } catch (error) {
+
+            console.warn(
+                '[KameSame JapanDict] ' +
+                'Vokabel konnte nicht dekodiert werden:',
+                error
+            );
+
+            return;
+        }
+
+
+        if (!word) {
+            return;
+        }
+
+        // JapanDict-SUCHE
+
+
+        const japanDictURL =
+            JAPANDICT_BASE +
+            '?s=' +
+            encodeURIComponent(word);
+
+
+        // Prüfen, ob JapanDict schon existiert
+
+        let japanDictApp =
+            apps.querySelector(
+                '[data-kamesame-japandict="true"]'
+            );
+
+
+        if (japanDictApp) {
+
+            const link =
+                japanDictApp.querySelector('a');
+
+            if (link) {
+                link.href = japanDictURL;
+            }
+
+
+            // JapanDict immer ganz vorne
+            if (
+                apps.firstElementChild !==
+                japanDictApp
+            ) {
+
+                apps.prepend(japanDictApp);
+            }
+
+
+            return;
+        }
+
+
+        // Erstellung des Buttons
+
+
+        japanDictApp =
+            document.createElement('div');
+
+        japanDictApp.className = 'app';
+
+        japanDictApp.dataset.kamesameJapandict =
+            'true';
+
+
+        // Der Link
+
+        const link =
+            document.createElement('a');
+
+        link.href =
+            japanDictURL;
+
+        link.target =
+            '_blank';
+
+        link.rel =
+            'noopener noreferrer';
+
+        // Icon als img
+
+        const img =
+            document.createElement('img');
+
+        img.src =
+            createJapanDictIcon();
+
+        img.alt =
+            'JapanDict';
+
+
+        link.appendChild(img);
+
+
+        // Titel
+
+
+        const title =
+            document.createElement('div');
+
+        title.className =
+            'title';
+
+        title.textContent =
+            'JapanDict';
+
+
+        // Button zusammensetzen
+
+
+        japanDictApp.appendChild(link);
+
+        japanDictApp.appendChild(title);
+
+
+        // JapanDict an Position 1
+
+
+        apps.prepend(japanDictApp);
+    }
+
+
+    // DOM-Änderungen überwachen
+
+    let updateScheduled = false;
+
+
+    const observer =
+        new MutationObserver(() => {
+
+            if (updateScheduled) {
+                return;
+            }
+
+            updateScheduled = true;
+
+
+            requestAnimationFrame(() => {
+
+                updateScheduled = false;
+
+                addJapanDict();
+            });
+        });
+
+
+    observer.observe(
+        document.body,
+        {
+            childList: true,
+            subtree: true
+        }
+    );
+
+
+
+    addJapanDict();
+
+})();
